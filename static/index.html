@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SpamScan — Email Classifier</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  @font-face {
+    font-family: 'Akira Expanded';
+    src: url('https://db.onlinewebfonts.com/t/193357aeaf7a4f09b80a1e6b6b99bc5b.woff2') format('woff2'),
+         url('https://db.onlinewebfonts.com/t/193357aeaf7a4f09b80a1e6b6b99bc5b.woff') format('woff');
+  }
+</style>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0c0c0f;
+      --surface: #13131a;
+      --border: #1f1f2e;
+      --accent: #e8ff47;
+      --accent2: #ff4747;
+      --text: #e8e8f0;
+      --muted: #5a5a7a;
+      --ham-color: #47ffb2;
+      --spam-color: #ff4747;
+    }
+
+    body {
+      font-family: 'Syne', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px 60px;
+      overflow-x: hidden;
+    }
+
+    /* Background grid */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(232,255,71,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(232,255,71,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 680px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Header */
+    header {
+      text-align: center;
+      margin-bottom: 48px;
+      animation: fadeUp 0.6s ease both;
+    }
+
+    .logo-tag {
+      display: inline-block;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 3px;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      padding: 4px 10px;
+      margin-bottom: 20px;
+      text-transform: uppercase;
+    }
+
+    h1 {
+    font-family: 'Akira Expanded', 'Syne', sans-serif;
+    font-size: clamp(2rem, 7vw, 3.5rem);
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    }
+
+    h1 span {
+      color: var(--accent);
+    }
+
+    .subtitle {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 15px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-weight: 400;
+    }
+
+    /* Card */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 32px;
+      animation: fadeUp 0.6s 0.15s ease both;
+    }
+
+    .field-label {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      display: block;
+    }
+
+    textarea {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      color: var(--text);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 13.5px;
+      line-height: 1.7;
+      padding: 16px;
+      resize: vertical;
+      min-height: 160px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    textarea:focus {
+      border-color: var(--accent);
+    }
+
+    textarea::placeholder {
+      color: var(--muted);
+    }
+
+    .btn {
+      margin-top: 16px;
+      width: 100%;
+      padding: 15px 24px;
+      background: var(--accent);
+      color: #0c0c0f;
+      font-family: 'Syne', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn:hover { opacity: 0.88; }
+    .btn:active { transform: scale(0.99); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Spinner */
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(0,0,0,0.3);
+      border-top-color: #000;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+
+    /* Result */
+    #result {
+      margin-top: 20px;
+      border-radius: 3px;
+      padding: 24px;
+      display: none;
+      animation: fadeUp 0.4s ease both;
+    }
+
+    #result.spam {
+      background: rgba(255,71,71,0.08);
+      border: 1px solid rgba(255,71,71,0.3);
+    }
+
+    #result.ham {
+      background: rgba(71,255,178,0.06);
+      border: 1px solid rgba(71,255,178,0.25);
+    }
+
+    .result-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+
+    .result-icon {
+      font-size: 2rem;
+      line-height: 1;
+    }
+
+    .result-verdict {
+      font-size: 1.8rem;
+      font-weight: 800;
+      letter-spacing: -1px;
+    }
+
+    #result.spam .result-verdict { color: var(--spam-color); }
+    #result.ham .result-verdict { color: var(--ham-color); }
+
+    .result-sub {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    /* Probability bars */
+    .bars { display: flex; flex-direction: column; gap: 10px; }
+
+    .bar-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .bar-label {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      width: 40px;
+      color: var(--muted);
+    }
+
+    .bar-track {
+      flex: 1;
+      height: 6px;
+      background: var(--border);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 99px;
+      transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+      width: 0%;
+    }
+
+    .bar-fill.spam { background: var(--spam-color); }
+    .bar-fill.ham  { background: var(--ham-color); }
+
+    .bar-pct {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 12px;
+      font-weight: 500;
+      width: 42px;
+      text-align: right;
+    }
+
+    /* Samples */
+    .samples-section {
+      margin-top: 28px;
+      animation: fadeUp 0.6s 0.3s ease both;
+    }
+
+    .samples-title {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+
+    .sample-chips {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .chip-row {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+    }
+
+    .chip {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      padding: 6px 12px;
+      border-radius: 2px;
+      cursor: pointer;
+      transition: all 0.15s;
+      border: 1px solid;
+    }
+
+    .chip.spam-chip {
+      background: rgba(255,71,71,0.06);
+      border-color: rgba(255,71,71,0.25);
+      color: var(--spam-color);
+    }
+
+    .chip.spam-chip:hover {
+      background: rgba(255,71,71,0.14);
+    }
+
+    .chip.ham-chip {
+      background: rgba(71,255,178,0.04);
+      border-color: rgba(71,255,178,0.2);
+      color: var(--ham-color);
+    }
+
+    .chip.ham-chip:hover {
+      background: rgba(71,255,178,0.1);
+    }
+
+    /* How it works */
+    .info-section {
+      margin-top: 28px;
+      padding: 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      animation: fadeUp 0.6s 0.45s ease both;
+    }
+
+    .info-title {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .info-item {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .info-item strong {
+      color: var(--text);
+      display: block;
+      margin-bottom: 2px;
+      font-size: 13px;
+    }
+
+    /* Footer */
+    footer {
+      margin-top: 40px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+      text-align: center;
+      animation: fadeUp 0.6s 0.6s ease both;
+    }
+
+    /* Error */
+    .error-msg {
+      margin-top: 12px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 12px;
+      color: var(--spam-color);
+      display: none;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(18px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <header>
+      
+      <h1>Spam<span>Scan</span></h1>
+      <p class="subtitle">// CHECK IF YOUR MAIL IS SPAM/HAM</p>
+    </header>
+
+    <div class="card">
+      <label class="field-label" for="emailInput">Paste your email content</label>
+      <textarea
+        id="emailInput"
+        placeholder="e.g. Congratulations! You've won a $1000 gift card. Click here to claim now..."
+      ></textarea>
+
+      <div class="error-msg" id="errorMsg">⚠ Please enter some email text first.</div>
+
+      <button class="btn" id="classifyBtn" onclick="classify()">
+        <div class="spinner" id="spinner"></div>
+        <span id="btnText">Classify Email</span>
+      </button>
+
+      <div id="result">
+        <div class="result-header">
+          <div class="result-icon" id="resultIcon"></div>
+          <div>
+            <div class="result-verdict" id="resultVerdict"></div>
+            <div class="result-sub" id="resultSub"></div>
+          </div>
+        </div>
+        <div class="bars">
+          <div class="bar-row">
+            <span class="bar-label">Spam</span>
+            <div class="bar-track"><div class="bar-fill spam" id="spamBar"></div></div>
+            <span class="bar-pct" id="spamPct" style="color:var(--spam-color)"></span>
+          </div>
+          <div class="bar-row">
+            <span class="bar-label">Ham</span>
+            <div class="bar-track"><div class="bar-fill ham" id="hamBar"></div></div>
+            <span class="bar-pct" id="hamPct" style="color:var(--ham-color)"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sample Emails -->
+    <div class="samples-section">
+  <p class="samples-title">Try a sample</p>
+  <div class="sample-chips">
+    <div class="chip-row">
+      <div class="chip spam-chip" onclick="loadSample('spam1')">💸 Prize winner</div>
+      <div class="chip spam-chip" onclick="loadSample('spam2')">🎰 Casino bonus</div>
+      <div class="chip spam-chip" onclick="loadSample('spam3')">🏦 Account alert</div>
+    </div>
+    <div class="chip-row">
+      <div class="chip ham-chip" onclick="loadSample('ham1')">📅 Meeting reschedule</div>
+      <div class="chip ham-chip" onclick="loadSample('ham2')">☕ Casual catch-up</div>
+      <div class="chip ham-chip" onclick="loadSample('ham3')">📚 Study question</div>
+    </div>
+  </div>
+</div>
+
+    <!-- How it works -->
+    <div class="info-section">
+      <p class="info-title">// How it works</p>
+      <div class="info-grid">
+        <div class="info-item">
+          <strong>1. TF-IDF Vectorization</strong>
+          Converts email text into numerical features, weighting rare but important words higher.
+        </div>
+        <div class="info-item">
+          <strong>2. Naive Bayes Classifier</strong>
+          Applies Bayes' theorem assuming word independence to compute spam/ham probabilities.
+        </div>
+        <div class="info-item">
+          <strong>3. Bigram Features</strong>
+          Captures word pairs like "free money" for better context understanding.
+        </div>
+        <div class="info-item">
+          <strong>4. Confidence Score</strong>
+          The model outputs a probability, not just a label — shown as a percentage above.
+        </div>
+      </div>
+    </div>
+
+    <footer>SpamScan · Naive Bayes Classifier · Built for Email Classification</footer>
+  </div>
+
+  <script>
+    const samples = {
+      spam1: "CONGRATULATIONS! You've been selected as our lucky winner. You have won a $5,000 gift card. Click here immediately to claim your prize before it expires!",
+      spam2: "You've been randomly selected for our VIP casino bonus! Get $1000 free chips. No deposit needed. Claim now at www.casino-vip-bonus.com!",
+      spam3: "URGENT: Your bank account has been compromised. Please verify your identity immediately by clicking this link: http://secure-bank-verify.com",
+      ham1: "Hi, just wanted to let you know the team meeting has been rescheduled from Monday to Wednesday at 3pm. Please update your calendar accordingly.",
+      ham2: "Hey! It's been ages. Are you free sometime next week to grab coffee and catch up? I'd love to hear how things have been going.",
+      ham3: "Can you help me understand question 3 on the assignment? I'm confused about how to apply the formula they gave us in lecture.",
+    };
+
+    function loadSample(key) {
+      document.getElementById('emailInput').value = samples[key];
+      document.getElementById('result').style.display = 'none';
+      document.getElementById('errorMsg').style.display = 'none';
+    }
+
+    async function classify() {
+      const email = document.getElementById('emailInput').value.trim();
+      const btn = document.getElementById('classifyBtn');
+      const spinner = document.getElementById('spinner');
+      const btnText = document.getElementById('btnText');
+      const errorMsg = document.getElementById('errorMsg');
+
+      if (!email) {
+        errorMsg.style.display = 'block';
+        return;
+      }
+      errorMsg.style.display = 'none';
+
+      // Loading state
+      btn.disabled = true;
+      spinner.style.display = 'block';
+      btnText.textContent = 'Analyzing...';
+
+      try {
+        const res = await fetch('/predict', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+
+        const data = await res.json();
+
+        if (data.error) {
+          alert(data.error);
+          return;
+        }
+
+        showResult(data);
+      } catch (err) {
+        alert('Could not connect to the server. Make sure app.py is running.');
+      } finally {
+        btn.disabled = false;
+        spinner.style.display = 'none';
+        btnText.textContent = 'Classify Email';
+      }
+    }
+
+    function showResult(data) {
+      const resultDiv = document.getElementById('result');
+      const isSpam = data.prediction === 'spam';
+
+      resultDiv.className = isSpam ? 'spam' : 'ham';
+      resultDiv.style.display = 'block';
+
+      document.getElementById('resultIcon').textContent = isSpam ? '🚨' : '✅';
+      document.getElementById('resultVerdict').textContent = isSpam ? 'SPAM' : 'HAM (Legit)';
+      document.getElementById('resultSub').textContent =
+        `${data.confidence}% confidence · Model: Naive Bayes`;
+
+      // Animate bars
+      setTimeout(() => {
+        document.getElementById('spamBar').style.width = data.spam_probability + '%';
+        document.getElementById('hamBar').style.width  = data.ham_probability + '%';
+      }, 80);
+
+      document.getElementById('spamPct').textContent = data.spam_probability + '%';
+      document.getElementById('hamPct').textContent  = data.ham_probability + '%';
+    }
+
+    // Allow Ctrl+Enter to classify
+    document.getElementById('emailInput').addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.key === 'Enter') classify();
+    });
+  </script>
+</body>
+</html>
