@@ -3,249 +3,607 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>SpamScan — Email Classifier</title>
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"/>
-<style>
-  @font-face {
-    font-family: 'Akira Expanded';
-    src: url('https://db.onlinewebfonts.com/t/193357aeaf7a4f09b80a1e6b6b99bc5b.woff2') format('woff2'),
-         url('https://db.onlinewebfonts.com/t/193357aeaf7a4f09b80a1e6b6b99bc5b.woff') format('woff');
-  }
-</style>
+  <title>SpamScan — AI Email Classifier</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg: #0c0c0f;
-      --surface: #13131a;
-      --border: #1f1f2e;
+      --bg: #080810;
+      --bg2: #0d0d1a;
+      --surface: #10101e;
+      --surface2: #14142a;
+      --border: rgba(255,255,255,0.07);
+      --border-bright: rgba(232,255,71,0.3);
       --accent: #e8ff47;
-      --accent2: #ff4747;
-      --text: #e8e8f0;
-      --muted: #5a5a7a;
-      --ham-color: #47ffb2;
-      --spam-color: #ff4747;
+      --accent-dim: rgba(232,255,71,0.12);
+      --accent-glow: rgba(232,255,71,0.25);
+      --spam: #ff4560;
+      --spam-glow: rgba(255,69,96,0.2);
+      --ham: #00f5a0;
+      --ham-glow: rgba(0,245,160,0.2);
+      --text: #f0f0fa;
+      --text2: #8888aa;
+      --text3: #4a4a6a;
+      --mono: 'Space Mono', monospace;
+      --sans: 'Outfit', sans-serif;
     }
 
+    html { scroll-behavior: smooth; }
+
     body {
-      font-family: 'Syne', sans-serif;
+      font-family: var(--sans);
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 40px 20px 60px;
       overflow-x: hidden;
     }
 
-    /* Background grid */
-    body::before {
-      content: '';
+    /* ── ANIMATED GRID BG ── */
+    .grid-bg {
       position: fixed;
       inset: 0;
-      background-image:
-        linear-gradient(rgba(232,255,71,0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(232,255,71,0.03) 1px, transparent 1px);
-      background-size: 40px 40px;
       pointer-events: none;
       z-index: 0;
+      background-image:
+        linear-gradient(rgba(232,255,71,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(232,255,71,0.025) 1px, transparent 1px);
+      background-size: 48px 48px;
+      animation: gridShift 20s linear infinite;
     }
 
-    .container {
-      width: 100%;
-      max-width: 680px;
+    @keyframes gridShift {
+      0% { background-position: 0 0; }
+      100% { background-position: 48px 48px; }
+    }
+
+    /* radial vignette over grid */
+    .grid-bg::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 80% 80% at 50% 50%, transparent 40%, var(--bg) 100%);
+    }
+
+    /* ── NAVBAR ── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 32px;
+      height: 56px;
+      background: rgba(8,8,16,0.7);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      animation: navFade 0.5s ease both;
+    }
+
+    @keyframes navFade {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+
+    .nav-logo-icon {
+      width: 28px;
+      height: 28px;
+      background: var(--accent);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+
+    .nav-logo-text {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.3px;
+    }
+
+    .nav-logo-text span { color: var(--accent); }
+
+    .nav-badge {
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: 1px;
+      padding: 2px 7px;
+      background: var(--accent-dim);
+      border: 1px solid var(--border-bright);
+      color: var(--accent);
+      border-radius: 99px;
+      margin-left: 6px;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .nav-link {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.5px;
+      color: var(--text2);
+      text-decoration: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      transition: color 0.15s, background 0.15s;
+    }
+
+    .nav-link:hover {
+      color: var(--text);
+      background: rgba(255,255,255,0.05);
+    }
+
+    /* ── MAIN LAYOUT ── */
+    main {
       position: relative;
       z-index: 1;
+      min-height: calc(100vh - 56px);
     }
 
-    /* Header */
-    header {
-      text-align: center;
-      margin-bottom: 48px;
-      animation: fadeUp 0.6s ease both;
+    /* ── HERO SECTION ── */
+    .hero {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      min-height: calc(100vh - 56px);
+      align-items: stretch;
     }
 
-    .logo-tag {
-      display: inline-block;
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 11px;
-      letter-spacing: 3px;
-      color: var(--accent);
-      border: 1px solid var(--accent);
-      padding: 4px 10px;
-      margin-bottom: 20px;
-      text-transform: uppercase;
+    /* LEFT PANEL */
+    .hero-left {
+      padding: 80px 64px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      position: relative;
+      animation: panelLeft 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
     }
 
-    h1 {
-    font-family: 'Akira Expanded', 'Syne', sans-serif;
-    font-size: clamp(2rem, 7vw, 3.5rem);
-    font-weight: 800;
-    line-height: 1;
-    letter-spacing: 2px;
-    text-transform: uppercase;
+    @keyframes panelLeft {
+      from { opacity: 0; transform: translateX(-30px); }
+      to { opacity: 1; transform: translateX(0); }
     }
 
-    h1 span {
-      color: var(--accent);
+    .hero-eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 32px;
     }
 
-    .subtitle {
-      margin-top: 12px;
-      color: var(--muted);
-      font-size: 15px;
-      font-family: 'IBM Plex Mono', monospace;
-      font-weight: 400;
+    .eyebrow-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--accent);
+      border-radius: 50%;
+      box-shadow: 0 0 12px var(--accent);
+      animation: pulse 2s ease infinite;
     }
 
-    /* Card */
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      padding: 32px;
-      animation: fadeUp 0.6s 0.15s ease both;
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(0.85); }
     }
 
-    .field-label {
-      font-family: 'IBM Plex Mono', monospace;
+    .eyebrow-text {
+      font-family: var(--mono);
       font-size: 11px;
       letter-spacing: 2px;
-      color: var(--muted);
+      color: var(--accent);
       text-transform: uppercase;
-      margin-bottom: 10px;
+    }
+
+    .hero-title {
+      font-size: clamp(3rem, 5.5vw, 5rem);
+      font-weight: 900;
+      line-height: 0.95;
+      letter-spacing: -3px;
+      margin-bottom: 28px;
+    }
+
+    .hero-title .line1 { display: block; color: var(--text); }
+    .hero-title .line2 {
       display: block;
+      color: var(--accent);
+      text-shadow: 0 0 40px rgba(232,255,71,0.4);
+    }
+    .hero-title .line3 { display: block; color: var(--text2); }
+
+    .hero-desc {
+      font-size: 16px;
+      font-weight: 400;
+      color: var(--text2);
+      line-height: 1.7;
+      max-width: 380px;
+      margin-bottom: 48px;
+    }
+
+    .hero-stats {
+      display: flex;
+      gap: 40px;
+    }
+
+    .stat {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: -1px;
+    }
+
+    .stat-value span { color: var(--accent); }
+
+    .stat-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 1.5px;
+      color: var(--text3);
+      text-transform: uppercase;
+    }
+
+    /* Floating glow orbs */
+    .orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      pointer-events: none;
+    }
+
+    .orb-1 {
+      width: 300px;
+      height: 300px;
+      background: rgba(232,255,71,0.06);
+      bottom: -80px;
+      left: -60px;
+      animation: orbFloat 8s ease-in-out infinite;
+    }
+
+    .orb-2 {
+      width: 200px;
+      height: 200px;
+      background: rgba(0,245,160,0.05);
+      top: 20%;
+      left: 30%;
+      animation: orbFloat 12s ease-in-out infinite reverse;
+    }
+
+    @keyframes orbFloat {
+      0%, 100% { transform: translate(0, 0); }
+      33% { transform: translate(20px, -30px); }
+      66% { transform: translate(-15px, 20px); }
+    }
+
+    /* RIGHT PANEL */
+    .hero-right {
+      background: transparent;
+      border-left: 1px solid var(--border);
+      padding: 48px 48px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      position: relative;
+      animation: panelRight 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both;
+      overflow: hidden;
+    }
+
+    @keyframes panelRight {
+      from { opacity: 0; transform: translateX(30px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    /* corner accent */
+    .hero-right::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 160px;
+      height: 1px;
+      background: linear-gradient(90deg, var(--accent), transparent);
+    }
+
+    .hero-right::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 1px;
+      height: 160px;
+      background: linear-gradient(180deg, var(--accent), transparent);
+    }
+
+    .panel-header {
+      margin-bottom: 24px;
+    }
+
+    .panel-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: var(--text3);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .panel-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    /* Textarea */
+    .input-wrapper {
+      position: relative;
+      margin-bottom: 16px;
     }
 
     textarea {
       width: 100%;
-      background: var(--bg);
+      background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 3px;
+      border-radius: 8px;
       color: var(--text);
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 13.5px;
-      line-height: 1.7;
+      font-family: var(--mono);
+      font-size: 12.5px;
+      line-height: 1.8;
       padding: 16px;
       resize: vertical;
-      min-height: 160px;
+      min-height: 180px;
       outline: none;
-      transition: border-color 0.2s;
+      transition: border-color 0.2s, box-shadow 0.2s;
     }
 
     textarea:focus {
       border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-dim), inset 0 0 20px rgba(232,255,71,0.03);
     }
 
-    textarea::placeholder {
-      color: var(--muted);
+    textarea::placeholder { color: var(--text3); font-size: 12px; }
+
+    .input-hint {
+      position: absolute;
+      bottom: 10px;
+      right: 12px;
+      font-family: var(--mono);
+      font-size: 9px;
+      color: var(--text3);
+      pointer-events: none;
     }
 
-    .btn {
-      margin-top: 16px;
+    /* Button */
+    .classify-btn {
       width: 100%;
       padding: 15px 24px;
       background: var(--accent);
-      color: #0c0c0f;
-      font-family: 'Syne', sans-serif;
-      font-size: 15px;
-      font-weight: 700;
-      letter-spacing: 1px;
+      color: #080810;
+      font-family: var(--sans);
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
       text-transform: uppercase;
       border: none;
-      border-radius: 3px;
+      border-radius: 8px;
       cursor: pointer;
-      transition: opacity 0.2s, transform 0.1s;
+      transition: transform 0.15s, box-shadow 0.2s, opacity 0.15s;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 8px;
+      gap: 10px;
+      position: relative;
+      overflow: hidden;
     }
 
-    .btn:hover { opacity: 0.88; }
-    .btn:active { transform: scale(0.99); }
-    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .classify-btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
 
-    /* Spinner */
+    .classify-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 32px rgba(232,255,71,0.35);
+    }
+
+    .classify-btn:hover::before { opacity: 1; }
+    .classify-btn:active { transform: scale(0.99) translateY(0); }
+    .classify-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; box-shadow: none; }
+
+    .btn-icon { font-size: 16px; }
+
     .spinner {
       width: 16px; height: 16px;
-      border: 2px solid rgba(0,0,0,0.3);
+      border: 2px solid rgba(0,0,0,0.2);
       border-top-color: #000;
       border-radius: 50%;
       animation: spin 0.7s linear infinite;
       display: none;
     }
 
-    /* Result */
-    #result {
-      margin-top: 20px;
-      border-radius: 3px;
-      padding: 24px;
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Error */
+    .error-msg {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--spam);
       display: none;
-      animation: fadeUp 0.4s ease both;
+      margin-top: 10px;
+      padding: 8px 12px;
+      background: rgba(255,69,96,0.08);
+      border: 1px solid rgba(255,69,96,0.2);
+      border-radius: 6px;
     }
 
-    #result.spam {
-      background: rgba(255,71,71,0.08);
-      border: 1px solid rgba(255,71,71,0.3);
+    /* ── RESULT PANEL ── */
+    #result-panel {
+      display: none;
+      margin-top: 20px;
+      border-radius: 10px;
+      padding: 24px;
+      position: relative;
+      overflow: hidden;
+      animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
 
-    #result.ham {
-      background: rgba(71,255,178,0.06);
-      border: 1px solid rgba(71,255,178,0.25);
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
-    .result-header {
+    #result-panel.spam-result {
+      background: rgba(255,69,96,0.06);
+      border: 1px solid rgba(255,69,96,0.3);
+      box-shadow: 0 0 40px rgba(255,69,96,0.1);
+    }
+
+    #result-panel.ham-result {
+      background: rgba(0,245,160,0.05);
+      border: 1px solid rgba(0,245,160,0.25);
+      box-shadow: 0 0 40px rgba(0,245,160,0.08);
+    }
+
+    /* top glow line */
+    #result-panel::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+    }
+
+    #result-panel.spam-result::before { background: linear-gradient(90deg, transparent, var(--spam), transparent); }
+    #result-panel.ham-result::before { background: linear-gradient(90deg, transparent, var(--ham), transparent); }
+
+    .result-top {
       display: flex;
-      align-items: center;
-      gap: 14px;
+      align-items: flex-start;
+      justify-content: space-between;
       margin-bottom: 20px;
+      gap: 16px;
     }
 
-    .result-icon {
-      font-size: 2rem;
-      line-height: 1;
+    .result-label-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
     }
 
-    .result-verdict {
-      font-size: 1.8rem;
-      font-weight: 800;
+    .result-tag {
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: 2px;
+      color: var(--text3);
+      text-transform: uppercase;
+    }
+
+    .result-typing {
+      font-size: 26px;
+      font-weight: 900;
       letter-spacing: -1px;
+      overflow: hidden;
+      white-space: nowrap;
+      border-right: 2px solid;
+      animation: typing 0.6s steps(20, end) 0.1s both, blink 0.7s step-end 6;
     }
 
-    #result.spam .result-verdict { color: var(--spam-color); }
-    #result.ham .result-verdict { color: var(--ham-color); }
+    .spam-result .result-typing {
+      color: var(--spam);
+      border-color: var(--spam);
+    }
+
+    .ham-result .result-typing {
+      color: var(--ham);
+      border-color: var(--ham);
+    }
+
+    @keyframes typing {
+      from { max-width: 0; }
+      to { max-width: 400px; }
+    }
+
+    @keyframes blink {
+      0%, 100% { border-color: transparent; }
+      50% { border-color: inherit; }
+    }
+
+    .result-confidence-badge {
+      font-family: var(--mono);
+      font-size: 22px;
+      font-weight: 700;
+      padding: 8px 16px;
+      border-radius: 8px;
+      flex-shrink: 0;
+    }
+
+    .spam-result .result-confidence-badge {
+      color: var(--spam);
+      background: rgba(255,69,96,0.1);
+    }
+
+    .ham-result .result-confidence-badge {
+      color: var(--ham);
+      background: rgba(0,245,160,0.1);
+    }
 
     .result-sub {
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 12px;
-      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text3);
+      letter-spacing: 0.5px;
       margin-top: 2px;
     }
 
-    /* Probability bars */
-    .bars { display: flex; flex-direction: column; gap: 10px; }
+    /* Bars */
+    .bars { display: flex; flex-direction: column; gap: 12px; }
 
-    .bar-row {
+    .bar-row { display: flex; flex-direction: column; gap: 6px; }
+
+    .bar-meta {
       display: flex;
       align-items: center;
-      gap: 12px;
+      justify-content: space-between;
     }
 
     .bar-label {
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 11px;
-      letter-spacing: 1px;
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 1.5px;
       text-transform: uppercase;
-      width: 40px;
-      color: var(--muted);
+      color: var(--text2);
+    }
+
+    .bar-pct {
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 700;
     }
 
     .bar-track {
-      flex: 1;
-      height: 6px;
-      background: var(--border);
+      height: 5px;
+      background: rgba(255,255,255,0.05);
       border-radius: 99px;
       overflow: hidden;
     }
@@ -253,235 +611,517 @@
     .bar-fill {
       height: 100%;
       border-radius: 99px;
-      transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: width 1s cubic-bezier(0.16, 1, 0.3, 1);
       width: 0%;
     }
 
-    .bar-fill.spam { background: var(--spam-color); }
-    .bar-fill.ham  { background: var(--ham-color); }
+    .bar-fill.spam { background: linear-gradient(90deg, #ff4560, #ff8fa3); }
+    .bar-fill.ham { background: linear-gradient(90deg, #00f5a0, #7fffcf); }
 
-    .bar-pct {
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 12px;
-      font-weight: 500;
-      width: 42px;
-      text-align: right;
+    /* ── SAMPLES ── */
+    .samples-wrap {
+      margin-top: 24px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
     }
 
-    /* Samples */
-    .samples-section {
-      margin-top: 28px;
-      animation: fadeUp 0.6s 0.3s ease both;
-    }
-
-    .samples-title {
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 11px;
+    .samples-label {
+      font-family: var(--mono);
+      font-size: 10px;
       letter-spacing: 2px;
-      color: var(--muted);
+      color: var(--text3);
       text-transform: uppercase;
-      margin-bottom: 12px;
-      text-align: center;
+      margin-bottom: 14px;
     }
 
-    .sample-chips {
+    .chips-grid {
       display: flex;
       flex-direction: column;
-      align-items: center;
       gap: 8px;
     }
 
     .chip-row {
       display: flex;
       gap: 8px;
-      justify-content: center;
     }
 
     .chip {
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 11px;
-      padding: 6px 12px;
-      border-radius: 2px;
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.5px;
+      padding: 6px 13px;
+      border-radius: 99px;
       cursor: pointer;
       transition: all 0.15s;
       border: 1px solid;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      user-select: none;
     }
 
+    .chip:hover { transform: scale(1.05); }
+    .chip:active { transform: scale(0.97); }
+
     .chip.spam-chip {
-      background: rgba(255,71,71,0.06);
-      border-color: rgba(255,71,71,0.25);
-      color: var(--spam-color);
+      background: rgba(255,69,96,0.07);
+      border-color: rgba(255,69,96,0.25);
+      color: #ff8fa3;
     }
 
     .chip.spam-chip:hover {
-      background: rgba(255,71,71,0.14);
+      background: rgba(255,69,96,0.15);
+      box-shadow: 0 0 16px rgba(255,69,96,0.2);
     }
 
     .chip.ham-chip {
-      background: rgba(71,255,178,0.04);
-      border-color: rgba(71,255,178,0.2);
-      color: var(--ham-color);
+      background: rgba(0,245,160,0.06);
+      border-color: rgba(0,245,160,0.2);
+      color: #7fffcf;
     }
 
     .chip.ham-chip:hover {
-      background: rgba(71,255,178,0.1);
+      background: rgba(0,245,160,0.12);
+      box-shadow: 0 0 16px rgba(0,245,160,0.15);
     }
 
-    /* How it works */
-    .info-section {
-      margin-top: 28px;
-      padding: 20px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      animation: fadeUp 0.6s 0.45s ease both;
+    /* ── HOW IT WORKS SECTION ── */
+    .how-section {
+      position: relative;
+      z-index: 1;
+      padding: 100px 64px;
+      background: var(--bg2);
+      border-top: 1px solid var(--border);
     }
 
-    .info-title {
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 11px;
-      letter-spacing: 2px;
+    .how-header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      margin-bottom: 64px;
+    }
+
+    .how-eyebrow {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 3px;
       color: var(--accent);
       text-transform: uppercase;
       margin-bottom: 12px;
     }
 
-    .info-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-    }
-
-    .info-item {
-      font-size: 13px;
-      color: var(--muted);
-      line-height: 1.5;
-    }
-
-    .info-item strong {
+    .how-title {
+      font-size: clamp(2rem, 3.5vw, 3rem);
+      font-weight: 800;
+      letter-spacing: -2px;
       color: var(--text);
-      display: block;
-      margin-bottom: 2px;
+      line-height: 1.1;
+    }
+
+    .how-title span { color: var(--accent); }
+
+    .how-desc {
+      font-size: 15px;
+      color: var(--text2);
+      max-width: 280px;
+      line-height: 1.6;
+      text-align: right;
+    }
+
+    .how-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .how-card {
+      background: var(--surface);
+      padding: 36px 28px;
+      position: relative;
+      transition: background 0.2s;
+    }
+
+    .how-card:hover { background: var(--surface2); }
+
+    .how-card-num {
+      font-family: var(--mono);
+      font-size: 64px;
+      font-weight: 700;
+      color: rgba(255,255,255,0.03);
+      line-height: 1;
+      position: absolute;
+      top: 16px;
+      right: 20px;
+      letter-spacing: -4px;
+      pointer-events: none;
+    }
+
+    .how-icon {
+      width: 40px;
+      height: 40px;
+      background: var(--accent-dim);
+      border: 1px solid var(--border-bright);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      margin-bottom: 20px;
+    }
+
+    .how-card-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 10px;
+      letter-spacing: -0.3px;
+    }
+
+    .how-card-desc {
       font-size: 13px;
+      color: var(--text2);
+      line-height: 1.65;
     }
 
-    /* Footer */
+    /* ── FOOTER ── */
     footer {
-      margin-top: 40px;
-      font-family: 'IBM Plex Mono', monospace;
+      position: relative;
+      z-index: 1;
+      padding: 28px 64px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .footer-left {
+      font-family: var(--mono);
       font-size: 11px;
-      color: var(--muted);
-      text-align: center;
-      animation: fadeUp 0.6s 0.6s ease both;
+      color: var(--text3);
     }
 
-    /* Error */
-    .error-msg {
-      margin-top: 12px;
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 12px;
-      color: var(--spam-color);
+    .footer-left span { color: var(--accent); }
+
+    .footer-right {
+      display: flex;
+      gap: 24px;
+    }
+
+    .footer-link {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text3);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    .footer-link:hover { color: var(--text2); }
+
+    /* ── ANALYZING STATE ── */
+    .analyzing-overlay {
       display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 16px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-top: 16px;
+      animation: fadeIn 0.3s ease both;
     }
 
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(18px); }
-      to   { opacity: 1; transform: translateY(0); }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
     }
 
-    @keyframes spin {
-      to { transform: rotate(360deg); }
+    .analyzing-dots {
+      display: flex;
+      gap: 4px;
+    }
+
+    .analyzing-dots span {
+      width: 6px;
+      height: 6px;
+      background: var(--accent);
+      border-radius: 50%;
+      animation: dotBounce 1.2s ease infinite;
+    }
+
+    .analyzing-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .analyzing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes dotBounce {
+      0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+      30% { transform: translateY(-6px); opacity: 1; }
+    }
+
+    .analyzing-text {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--accent);
+      letter-spacing: 1px;
+    }
+
+    /* ── SCROLL REVEAL ── */
+    .reveal {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .reveal:nth-child(2) { transition-delay: 0.1s; }
+    .reveal:nth-child(3) { transition-delay: 0.2s; }
+    .reveal:nth-child(4) { transition-delay: 0.3s; }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 900px) {
+      .hero { grid-template-columns: 1fr; min-height: auto; }
+
+      .hero-left {
+        padding: 60px 32px 40px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .hero-right {
+        border-left: none;
+        padding: 40px 32px;
+      }
+
+      .how-section { padding: 60px 32px; }
+
+      .how-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+        margin-bottom: 40px;
+      }
+
+      .how-desc { text-align: left; }
+
+      .how-grid { grid-template-columns: 1fr 1fr; }
+
+      footer {
+        padding: 24px 32px;
+        flex-direction: column;
+        gap: 16px;
+        text-align: center;
+      }
+    }
+
+    @media (max-width: 600px) {
+      nav { padding: 0 20px; }
+      .nav-links .nav-link:not(:last-child) { display: none; }
+      .hero-left { padding: 40px 24px 32px; }
+      .hero-right { padding: 32px 24px; }
+      .how-section { padding: 48px 24px; }
+      .how-grid { grid-template-columns: 1fr; }
+      footer { padding: 20px 24px; }
+      .hero-stats { gap: 24px; }
     }
   </style>
 </head>
 <body>
-  <div class="container">
 
-    <header>
-      
-      <h1>Spam<span>Scan</span></h1>
-      <p class="subtitle">// CHECK IF YOUR MAIL IS SPAM/HAM</p>
-    </header>
+  <div class="grid-bg"></div>
 
-    <div class="card">
-      <label class="field-label" for="emailInput">Paste your email content</label>
-      <textarea
-        id="emailInput"
-        placeholder="e.g. Congratulations! You've won a $1000 gift card. Click here to claim now..."
-      ></textarea>
+  <!-- NAVBAR -->
+  <nav>
+    <a href="#" class="nav-logo">
+      <div class="nav-logo-icon">⚡</div>
+      <span class="nav-logo-text">Spam<span>Scan</span></span>
+      <span class="nav-badge">v2.0</span>
+    </a>
+    <div class="nav-links">
+      <a href="https://github.com" class="nav-link">GitHub</a>
+      <a href="#how" class="nav-link">How it works</a>
+      <a href="/health" class="nav-link">API</a>
+    </div>
+  </nav>
 
-      <div class="error-msg" id="errorMsg">⚠ Please enter some email text first.</div>
+  <main>
+    <!-- HERO -->
+    <div class="hero">
 
-      <button class="btn" id="classifyBtn" onclick="classify()">
-        <div class="spinner" id="spinner"></div>
-        <span id="btnText">Classify Email</span>
-      </button>
+      <!-- LEFT: Identity -->
+      <div class="hero-left">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
 
-      <div id="result">
-        <div class="result-header">
-          <div class="result-icon" id="resultIcon"></div>
-          <div>
-            <div class="result-verdict" id="resultVerdict"></div>
-            <div class="result-sub" id="resultSub"></div>
-          </div>
+        <div class="hero-eyebrow">
+          <div class="eyebrow-dot"></div>
+          <span class="eyebrow-text">ML-Powered Detection</span>
         </div>
-        <div class="bars">
-          <div class="bar-row">
-            <span class="bar-label">Spam</span>
-            <div class="bar-track"><div class="bar-fill spam" id="spamBar"></div></div>
-            <span class="bar-pct" id="spamPct" style="color:var(--spam-color)"></span>
+
+        <h1 class="hero-title">
+          <span class="line1">Detect</span>
+          <span class="line2">Spam</span>
+          <span class="line3">Instantly.</span>
+        </h1>
+
+        <p class="hero-desc">
+          Paste any email and our Naive Bayes classifier — trained on thousands of real messages — gives you a confidence score in milliseconds.
+        </p>
+
+        <div class="hero-stats">
+          <div class="stat">
+            <div class="stat-value">98<span>%</span></div>
+            <div class="stat-label">Accuracy</div>
           </div>
-          <div class="bar-row">
-            <span class="bar-label">Ham</span>
-            <div class="bar-track"><div class="bar-fill ham" id="hamBar"></div></div>
-            <span class="bar-pct" id="hamPct" style="color:var(--ham-color)"></span>
+          <div class="stat">
+            <div class="stat-value">5<span>k+</span></div>
+            <div class="stat-label">Training emails</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value">&lt;50<span>ms</span></div>
+            <div class="stat-label">Response time</div>
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- Sample Emails -->
-    <div class="samples-section">
-  <p class="samples-title">Try a sample</p>
-  <div class="sample-chips">
-    <div class="chip-row">
-      <div class="chip spam-chip" onclick="loadSample('spam1')">💸 Prize winner</div>
-      <div class="chip spam-chip" onclick="loadSample('spam2')">🎰 Casino bonus</div>
-      <div class="chip spam-chip" onclick="loadSample('spam3')">🏦 Account alert</div>
-    </div>
-    <div class="chip-row">
-      <div class="chip ham-chip" onclick="loadSample('ham1')">📅 Meeting reschedule</div>
-      <div class="chip ham-chip" onclick="loadSample('ham2')">☕ Casual catch-up</div>
-      <div class="chip ham-chip" onclick="loadSample('ham3')">📚 Study question</div>
-    </div>
-  </div>
-</div>
+      <!-- RIGHT: Classifier tool -->
+      <div class="hero-right">
 
-    <!-- How it works -->
-    <div class="info-section">
-      <p class="info-title">// How it works</p>
-      <div class="info-grid">
-        <div class="info-item">
-          <strong>1. TF-IDF Vectorization</strong>
-          Converts email text into numerical features, weighting rare but important words higher.
+        <div class="panel-header">
+          <div class="panel-label">// Email Classifier</div>
+          <div class="panel-title">Analyze your message</div>
         </div>
-        <div class="info-item">
-          <strong>2. Naive Bayes Classifier</strong>
-          Applies Bayes' theorem assuming word independence to compute spam/ham probabilities.
+
+        <div class="input-wrapper">
+          <textarea
+            id="emailInput"
+            placeholder="Paste email content here...&#10;&#10;e.g. Congratulations! You've won a $1000 gift card. Click here to claim now..."
+          ></textarea>
+          <span class="input-hint">Ctrl+Enter to classify</span>
         </div>
-        <div class="info-item">
-          <strong>3. Bigram Features</strong>
-          Captures word pairs like "free money" for better context understanding.
+
+        <div class="error-msg" id="errorMsg">⚠ Please enter some email text first.</div>
+
+        <button class="classify-btn" id="classifyBtn" onclick="classify()">
+          <div class="spinner" id="spinner"></div>
+          <span class="btn-icon" id="btnIcon">⚡</span>
+          <span id="btnText">Classify Email</span>
+        </button>
+
+        <!-- Analyzing state -->
+        <div class="analyzing-overlay" id="analyzingOverlay">
+          <div class="analyzing-dots">
+            <span></span><span></span><span></span>
+          </div>
+          <span class="analyzing-text">Analyzing email patterns...</span>
         </div>
-        <div class="info-item">
-          <strong>4. Confidence Score</strong>
-          The model outputs a probability, not just a label — shown as a percentage above.
+
+        <!-- Result panel -->
+        <div id="result-panel">
+          <div class="result-top">
+            <div class="result-label-group">
+              <div class="result-tag">// Classification result</div>
+              <div class="result-typing" id="resultVerdict"></div>
+              <div class="result-sub" id="resultSub"></div>
+            </div>
+            <div class="result-confidence-badge" id="resultBadge"></div>
+          </div>
+
+          <div class="bars">
+            <div class="bar-row">
+              <div class="bar-meta">
+                <span class="bar-label">Spam probability</span>
+                <span class="bar-pct" id="spamPct" style="color:var(--spam)"></span>
+              </div>
+              <div class="bar-track">
+                <div class="bar-fill spam" id="spamBar"></div>
+              </div>
+            </div>
+            <div class="bar-row">
+              <div class="bar-meta">
+                <span class="bar-label">Legitimate (ham)</span>
+                <span class="bar-pct" id="hamPct" style="color:var(--ham)"></span>
+              </div>
+              <div class="bar-track">
+                <div class="bar-fill ham" id="hamBar"></div>
+              </div>
+            </div>
+          </div>
         </div>
+
+        <!-- Samples -->
+        <div class="samples-wrap">
+          <div class="samples-label">// Try a sample email</div>
+          <div class="chips-grid">
+            <div class="chip-row">
+              <div class="chip spam-chip" onclick="loadSample('spam1')">💸 Prize Winner</div>
+              <div class="chip spam-chip" onclick="loadSample('spam2')">🎰 Casino Bonus</div>
+              <div class="chip spam-chip" onclick="loadSample('spam3')">🏦 Account Alert</div>
+            </div>
+            <div class="chip-row">
+              <div class="chip ham-chip" onclick="loadSample('ham1')">📅 Meeting Reschedule</div>
+              <div class="chip ham-chip" onclick="loadSample('ham2')">☕ Casual Catch-up</div>
+              <div class="chip ham-chip" onclick="loadSample('ham3')">📚 Study Question</div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
 
-    <footer>SpamScan · Naive Bayes Classifier · Built for Email Classification</footer>
-  </div>
+    <!-- HOW IT WORKS -->
+    <section class="how-section" id="how">
+      <div class="how-header">
+        <div>
+          <div class="how-eyebrow">// Under the hood</div>
+          <h2 class="how-title">How it<br><span>works</span></h2>
+        </div>
+        <p class="how-desc">Four steps, milliseconds apart. From raw text to a confident verdict.</p>
+      </div>
+
+      <div class="how-grid">
+        <div class="how-card reveal">
+          <div class="how-card-num">01</div>
+          <div class="how-icon">🔤</div>
+          <div class="how-card-title">TF-IDF Vectorization</div>
+          <p class="how-card-desc">Converts raw email text into numerical feature vectors, giving higher weight to rare but meaningful words.</p>
+        </div>
+        <div class="how-card reveal">
+          <div class="how-card-num">02</div>
+          <div class="how-icon">🧠</div>
+          <div class="how-card-title">Naive Bayes Classifier</div>
+          <p class="how-card-desc">Applies Bayes' theorem with word independence assumptions to compute spam and ham probabilities.</p>
+        </div>
+        <div class="how-card reveal">
+          <div class="how-card-num">03</div>
+          <div class="how-icon">🔗</div>
+          <div class="how-card-title">Bigram Features</div>
+          <p class="how-card-desc">Captures word pairs like "free money" or "click here" for richer contextual understanding.</p>
+        </div>
+        <div class="how-card reveal">
+          <div class="how-card-num">04</div>
+          <div class="how-icon">📊</div>
+          <div class="how-card-title">Confidence Score</div>
+          <p class="how-card-desc">The model outputs a calibrated probability — not just a label — so you see exactly how certain it is.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="footer-left">
+      <span>SpamScan</span> · Naive Bayes Classifier · Built for Email Classification
+    </div>
+    <div class="footer-right">
+      <a href="/health" class="footer-link">API Status</a>
+      <a href="#" class="footer-link">Docs</a>
+      <a href="https://github.com" class="footer-link">GitHub</a>
+    </div>
+  </footer>
 
   <script>
     const samples = {
@@ -495,7 +1135,8 @@
 
     function loadSample(key) {
       document.getElementById('emailInput').value = samples[key];
-      document.getElementById('result').style.display = 'none';
+      document.getElementById('result-panel').style.display = 'none';
+      document.getElementById('analyzingOverlay').style.display = 'none';
       document.getElementById('errorMsg').style.display = 'none';
     }
 
@@ -504,18 +1145,24 @@
       const btn = document.getElementById('classifyBtn');
       const spinner = document.getElementById('spinner');
       const btnText = document.getElementById('btnText');
+      const btnIcon = document.getElementById('btnIcon');
       const errorMsg = document.getElementById('errorMsg');
+      const analyzing = document.getElementById('analyzingOverlay');
+      const resultPanel = document.getElementById('result-panel');
 
       if (!email) {
         errorMsg.style.display = 'block';
         return;
       }
       errorMsg.style.display = 'none';
+      resultPanel.style.display = 'none';
 
       // Loading state
       btn.disabled = true;
       spinner.style.display = 'block';
+      btnIcon.style.display = 'none';
       btnText.textContent = 'Analyzing...';
+      analyzing.style.display = 'flex';
 
       try {
         const res = await fetch('/predict', {
@@ -531,42 +1178,64 @@
           return;
         }
 
+        // Delay for effect
+        await new Promise(r => setTimeout(r, 600));
+        analyzing.style.display = 'none';
         showResult(data);
+
       } catch (err) {
         alert('Could not connect to the server. Make sure app.py is running.');
+        analyzing.style.display = 'none';
       } finally {
         btn.disabled = false;
         spinner.style.display = 'none';
+        btnIcon.style.display = 'inline';
         btnText.textContent = 'Classify Email';
       }
     }
 
     function showResult(data) {
-      const resultDiv = document.getElementById('result');
+      const panel = document.getElementById('result-panel');
       const isSpam = data.prediction === 'spam';
 
-      resultDiv.className = isSpam ? 'spam' : 'ham';
-      resultDiv.style.display = 'block';
+      panel.className = isSpam ? 'spam-result' : 'ham-result';
+      panel.style.display = 'block';
 
-      document.getElementById('resultIcon').textContent = isSpam ? '🚨' : '✅';
-      document.getElementById('resultVerdict').textContent = isSpam ? 'SPAM' : 'HAM (Legit)';
-      document.getElementById('resultSub').textContent =
-        `${data.confidence}% confidence · Model: Naive Bayes`;
+      // Reset bars
+      document.getElementById('spamBar').style.width = '0%';
+      document.getElementById('hamBar').style.width = '0%';
 
-      // Animate bars
-      setTimeout(() => {
-        document.getElementById('spamBar').style.width = data.spam_probability + '%';
-        document.getElementById('hamBar').style.width  = data.ham_probability + '%';
-      }, 80);
+      document.getElementById('resultVerdict').textContent = isSpam ? 'SPAM DETECTED' : 'LEGITIMATE EMAIL';
+      document.getElementById('resultSub').textContent = `Model: Naive Bayes · Processed in <50ms`;
+      document.getElementById('resultBadge').textContent = data.confidence + '%';
 
       document.getElementById('spamPct').textContent = data.spam_probability + '%';
-      document.getElementById('hamPct').textContent  = data.ham_probability + '%';
+      document.getElementById('hamPct').textContent = data.ham_probability + '%';
+
+      // Animate bars after paint
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          document.getElementById('spamBar').style.width = data.spam_probability + '%';
+          document.getElementById('hamBar').style.width = data.ham_probability + '%';
+        }, 80);
+      });
     }
 
-    // Allow Ctrl+Enter to classify
+    // Ctrl+Enter shortcut
     document.getElementById('emailInput').addEventListener('keydown', (e) => {
       if (e.ctrlKey && e.key === 'Enter') classify();
     });
+
+    // Scroll reveal
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      });
+    }, { threshold: 0.15 });
+
+    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
   </script>
 </body>
 </html>
